@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>발주서 → SAP 변환기</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#1a3a5c;--blue2:#112840;
+  --teal:#0e7c7b;--mint:#0d9488;--sage:#5eada7;
+  --amber:#d97706;--green:#27ae60;--red:#e74c3c;
+  --bg:#f0f2f5;--card:#fff;--border:#e0e8f0;
+  --text:#1a1a2e;--sub:#64748b;--hint:#94a3b8;
+  --info-bg:#eff6ff;--info-text:#1e40af;
+  --warn-bg:#fffbeb;--warn-border:#fbbf24;--warn-text:#92400e;
+  --chx-bg:#ecfdf5;--chx-text:#065f46;
+  --err-bg:#fef2f2;--err-text:#991b1b;
+}
+body{font-family:'IBM Plex Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:24px 16px}
+.page{max-width:960px;margin:0 auto}
+
+/* 헤더 */
+.hdr{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.logo{width:44px;height:44px;background:var(--blue);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.hdr h1{font-size:20px;font-weight:600;color:var(--text)}
+.hdr p{font-size:12px;color:var(--sub);margin-top:2px}
+.version{font-size:10px;background:var(--blue);color:#fff;padding:2px 7px;border-radius:10px;margin-left:8px;font-weight:500;font-family:'IBM Plex Mono',monospace}
+
+/* 토글 */
+.toggles{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.tog{font-size:12px;cursor:pointer;background:var(--card);border:1px solid var(--border);border-radius:7px;padding:5px 12px;color:var(--sub);transition:all .15s;user-select:none}
+.tog:hover,.tog.on{background:var(--info-bg);color:var(--info-text);border-color:#bfdbfe}
+.panel{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:14px 16px;margin-bottom:12px;display:none}
+.panel h3{font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:5px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:5px}
+.gi{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:6px;background:#f8fafc}
+.gi .gc{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--blue);font-weight:500;min-width:90px}
+.gi .gn{font-size:11px;color:var(--sub)}
+
+/* 업로드 존 */
+.drop{border:2px dashed #cbd5e1;border-radius:14px;background:var(--card);padding:32px 20px;text-align:center;transition:all .2s;margin-bottom:12px;position:relative}
+.drop.drag{border-color:var(--blue);background:#f0f4f8}
+.drop .d-ico{font-size:36px;margin-bottom:10px}
+.drop .d-lbl{font-size:15px;font-weight:500;color:var(--text);margin-bottom:10px}
+.btn-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:8px}
+.ubtn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;font-family:inherit;border:none;transition:all .15s}
+.ubtn.blue{background:var(--blue);color:#fff}.ubtn.blue:hover{background:var(--blue2)}
+.ubtn.teal{background:var(--teal);color:#fff}.ubtn.teal:hover{background:#095f5e}
+.drop-sub{font-size:11px;color:var(--hint)}
+
+/* paste 안내 */
+.paste-tip{background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:12px;color:var(--warn-text);line-height:1.7}
+.paste-tip strong{font-weight:600}
+.paste-zone{margin-top:10px;position:relative}
+.paste-zone label{display:block;font-size:12px;font-weight:500;color:var(--sub);margin-bottom:4px}
+.paste-area{width:100%;height:44px;border:1.5px dashed #cbd5e1;border-radius:8px;background:#f8fafc;padding:10px 14px;font-size:13px;color:var(--text);font-family:inherit;resize:none;transition:border-color .2s;outline:none}
+.paste-area:focus{border-color:var(--blue);background:#fff}
+.paste-area.has-img{border-color:var(--green);background:#f0faf5;color:var(--green);font-weight:500}
+
+/* 미리보기 */
+.preview{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:12px 15px;margin-bottom:12px;display:none}
+.preview h4{font-size:12px;font-weight:500;color:var(--sub);margin-bottom:8px}
+.preview img{max-width:100%;max-height:180px;border-radius:8px;border:1px solid var(--border);display:block}
+.iinfo{font-size:11px;color:var(--green);margin-top:5px;font-family:'IBM Plex Mono',monospace;font-weight:500}
+
+/* 로더/에러/디버그 */
+.loader{background:var(--card);border-radius:12px;padding:26px;text-align:center;display:none;margin-bottom:12px;border:1px solid var(--border)}
+.spin{width:28px;height:28px;border:3px solid #e2e8f0;border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite;margin:0 auto 10px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.lmsg{font-size:13px;color:var(--sub)}
+.err{background:var(--err-bg);border:1px solid #fca5a5;border-radius:10px;padding:12px 15px;color:var(--err-text);font-size:13px;display:none;margin-bottom:12px}
+.edet{font-family:'IBM Plex Mono',monospace;font-size:11px;background:#fff;padding:8px;border-radius:6px;margin-top:7px;max-height:100px;overflow-y:auto;white-space:pre-wrap;display:none}
+.dbg{background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;display:none}
+.dbg h4{font-size:11px;font-weight:600;color:var(--warn-text);margin-bottom:4px}
+
+/* 거래처 배너 */
+.vbanner{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:13px 17px;margin-bottom:12px;display:none;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:9px}
+.vb-left{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.vname{font-size:16px;font-weight:600}
+.vcode{font-family:'IBM Plex Mono',monospace;font-size:17px;color:var(--blue);background:var(--info-bg);padding:5px 15px;border-radius:8px;font-weight:600;letter-spacing:.5px}
+.vunk{font-size:12px;color:var(--warn-text);background:var(--warn-bg);padding:4px 12px;border-radius:7px}
+
+/* 결과 카드 */
+.result{background:var(--card);border-radius:14px;border:1px solid var(--border);overflow:hidden;display:none;margin-bottom:12px}
+.res-hdr{background:var(--blue);color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.res-hdr .title{font-size:14px;font-weight:600}
+.res-hdr .meta{font-size:12px;opacity:.75;margin-top:1px}
+.wbadge{background:var(--red);color:#fff;padding:3px 11px;border-radius:20px;font-size:11px;display:none}
+table{width:100%;border-collapse:collapse}
+thead tr{background:#f8fafc}
+th{padding:9px 14px;text-align:left;font-size:11px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+td{padding:9px 14px;font-size:13px;border-bottom:1px solid #f1f5f9;color:var(--text);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#f8fafc}
+tbody tr.chx td{background:var(--chx-bg)}
+tbody tr.chx:hover td{background:#d1fae5}
+.chxtag{font-size:10px;background:var(--teal);color:#fff;padding:1px 6px;border-radius:3px;margin-left:5px;font-weight:500;vertical-align:middle}
+.no-col{color:var(--hint);font-size:11px}
+.qty-col{font-weight:600;text-align:center}
+.sap-cell{display:flex;align-items:center;gap:7px}
+.sap{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;color:var(--blue);background:var(--info-bg);padding:3px 9px;border-radius:5px;white-space:nowrap}
+.sap.cs{color:var(--chx-text);background:var(--chx-bg)}
+.sap.ms{color:var(--err-text);background:var(--err-bg)}
+.cbtn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:24px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:5px;cursor:pointer;font-size:13px;color:var(--sub);transition:all .15s;flex-shrink:0;user-select:none}
+.cbtn:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+.cbtn.done{background:var(--green);color:#fff;border-color:var(--green)}
+.cbtn.dis{opacity:.25;cursor:default;pointer-events:none}
+.status{text-align:center;font-size:14px}
+
+/* 복사 섹션 */
+.csec{padding:15px 18px;border-top:1px solid #f1f5f9;background:#fafafa}
+.cblock{margin-bottom:13px}
+.blbl{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.blbl span{font-size:11px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.5px}
+.pill{font-size:11px;padding:2px 9px;border-radius:10px;font-weight:500}
+.po{background:var(--info-bg);color:var(--info-text)}
+.pc{background:var(--chx-bg);color:var(--chx-text)}
+.bbtns{display:flex;gap:7px;flex-wrap:wrap}
+.dh{height:1px;background:#f1f5f9;margin:13px 0}
+.bb{display:flex;gap:7px;flex-wrap:wrap}
+button{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-size:13px;font-weight:500;font-family:inherit;transition:all .15s;white-space:nowrap;background:var(--card);color:var(--text)}
+button:hover{background:#f8fafc}
+button.blue{background:var(--blue);color:#fff;border-color:var(--blue)}.blue:hover{background:var(--blue2)}
+button.teal{background:var(--teal);color:#fff;border-color:var(--teal)}
+button.mint{background:var(--mint);color:#fff;border-color:var(--mint)}
+button.sage{background:var(--sage);color:#fff;border-color:var(--sage)}
+button.amber{background:var(--amber);color:#fff;border-color:var(--amber)}
+button.green{background:var(--green);color:#fff;border-color:var(--green)}
+button.fl{background:var(--green)!important;border-color:var(--green)!important;color:#fff!important}
+button.cv{background:var(--blue);color:#fff;border-color:var(--blue);font-size:13px;padding:7px 14px}
+
+/* 토스트 */
+.toast{position:fixed;bottom:20px;right:20px;background:#1a1a2e;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.2)}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="hdr">
+  <div class="logo">📋</div>
+  <div>
+    <h1>발주서 → SAP 코드 변환기 <span class="version">v12</span></h1>
+    <p>경구제 / CHX 분리 복사 · 이미지 스크린샷 · 엑셀 · PDF 지원</p>
+  </div>
+</div>
+
+<div class="toggles">
+  <span class="tog" id="tog-map" onclick="tp('mapPanel','tog-map')">📦 품목 매핑표 (18개)</span>
+  <span class="tog" id="tog-ven" onclick="tp('vendorPanel','tog-ven')">🏢 거래처 코드표 (34개)</span>
+</div>
+<div class="panel" id="mapPanel"><h3>SAP 품목 코드 매핑</h3><div class="grid2" id="mapGrid"></div></div>
+<div class="panel" id="vendorPanel"><h3>거래처 코드 목록</h3><div class="grid3" id="vendorGrid"></div></div>
+
+<!-- 파일 인풋 -->
+<input type="file" id="fi-img"  accept="image/*"          style="display:none" onchange="onFI(this)">
+<input type="file" id="fi-file" accept=".xls,.xlsx,.pdf"  style="display:none" onchange="onFI(this)">
+
+<!-- 업로드 존 -->
+<div class="drop" id="drop" ondragover="doDrag(event)" ondragleave="doDrag(event,'l')" ondrop="doDrop(event)">
+  <div class="d-ico">📁</div>
+  <div class="d-lbl">파일을 여기에 드래그하거나 버튼으로 선택</div>
+  <div class="btn-row">
+    <label class="ubtn teal" for="fi-img">📸 이미지 선택 (스크린샷)</label>
+    <label class="ubtn blue" for="fi-file">📄 엑셀 / PDF 선택</label>
+  </div>
+  <div class="drop-sub">JPG · PNG · XLS · XLSX · PDF — 드래그앤드롭도 가능</div>
+
+  <!-- ★ Ctrl+V 붙여넣기: textarea로 캡처 -->
+  <div class="paste-zone">
+    <label for="pa">또는 여기 클릭 후 Ctrl+V로 스크린샷 붙여넣기</label>
+    <textarea class="paste-area" id="pa" placeholder="클릭 → Ctrl+V" onpaste="onPaste(event)" rows="1"></textarea>
+  </div>
+</div>
+
+<div class="preview" id="pv">
+  <h4>📸 선택/붙여넣은 이미지</h4>
+  <img id="pimg" src="" alt="">
+  <div class="iinfo" id="iinfo"></div>
+</div>
+<div class="loader" id="loader"><div class="spin"></div><div class="lmsg" id="lmsg">처리 중...</div></div>
+<div class="err" id="err"><span id="emsg"></span><div class="edet" id="edet"></div></div>
+<div class="dbg" id="dbg"><h4>🔍 컬럼 탐지</h4><code id="dbgc"></code></div>
+
+<div class="vbanner" id="vbanner">
+  <div class="vb-left"><div class="vname" id="vname"></div><div id="vcode"></div></div>
+  <button class="cv" onclick="cpVendor()">📋 거래처 코드 복사</button>
+</div>
+
+<div class="result" id="result">
+  <div class="res-hdr">
+    <div><div class="title">품목 목록</div><div class="meta" id="meta"></div></div>
+    <div class="wbadge" id="wb"></div>
+  </div>
+  <table>
+    <thead><tr>
+      <th style="width:30px">No</th><th>품명</th><th>규격</th>
+      <th style="width:54px;text-align:center">수량</th><th>SAP 코드</th>
+      <th style="width:34px;text-align:center">✓</th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="csec">
+    <div class="cblock">
+      <div class="blbl"><span>💊 경구제</span><span class="pill po" id="oc">0개</span></div>
+      <div class="bbtns">
+        <button class="blue"  id="boc" onclick="co('code')">📋 코드만</button>
+        <button class="teal"  id="boq" onclick="co('qty')">🔢 수량만</button>
+        <button class="amber" id="bob" onclick="co('both')">⇄ 코드+수량</button>
+      </div>
+    </div>
+    <div class="dh"></div>
+    <div class="cblock">
+      <div class="blbl"><span>🧴 클로르헥시딘 (CHX)</span><span class="pill pc" id="cc">0개</span></div>
+      <div class="bbtns">
+        <button class="mint" id="bcc" onclick="cx('code')">📋 코드만</button>
+        <button class="sage" id="bcq" onclick="cx('qty')">🔢 수량만</button>
+        <button class="mint" id="bcb" onclick="cx('both')">⇄ 코드+수량</button>
+      </div>
+    </div>
+    <div class="dh"></div>
+    <div class="bb">
+      <button class="green" id="ball" onclick="ca()">📊 전체 표 복사</button>
+      <button onclick="reset()">🔄 새 파일</button>
+    </div>
+  </div>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CHXC=new Set(['CHLOR100','CHLOR015']);
+const VD={"백제약품":926542,"지오영":928319,"복산나이스":550528,"경동사":936746,"인천약품":929285,"광주지오팜":928916,"대구지오팜":927196,"대전지오팜":927957,"서울지오팜":931410,"김약품":929208,"동원약품":928320,"대전동원약품":948154,"동원헬스케어":948156,"동원아이팜":948155,"훼밀리팜":945619,"백광약품":948494,"서울약사신협":927198,"세화약품":933364,"신덕약품":935437,"우정약품":930275,"유진약품":928917,"태전약품":927212,"티제이팜":929483,"연성약품":940143,"아이팜코리아":930134,"수정약품":939268,"이엠디":918682,"우분트팜":943287,"프리모":939767,"선메디텍":944081,"에스팜":940899,"비엘팜":941675,"성도약품":939568,"가온약품":933982};
+const MAP=[
+  {code:"CHLOR100",k:["클로르헥시딘","chlorhexidine","chx"],s:["100ml","100mL","10ea"],label:"클로르헥시딘액 100ML"},
+  {code:"CHLOR015",k:["클로르헥시딘","chlorhexidine","chx"],s:["15ml","15mL","15포","6포","6ea"],label:"클로르헥시딘액 15ML"},
+  {code:"OP-NA0300",k:["나프록소","naproxo","naproxen"],s:["300정","300t"],label:"NAPROXO TABLET 300T"},
+  {code:"OP-NA0030",k:["나프록소","naproxo","naproxen"],s:["30정","30t"],label:"오스템 나프록소 30정"},
+  {code:"OP-LO0500",k:["록소리펜","록소리렌","loxolifen"],s:["500정","500t"],label:"LOXOLIFEN TABLET 500T"},
+  {code:"OP-LO0030",k:["록소리펜","록소리렌","loxolifen"],s:["30정","30t"],label:"LOXOLIFEN TABLET 30T"},
+  {code:"OP-MO0100",k:["모사프리","mosapri"],s:["100정","100t"],label:"모사프리정 100T"},
+  {code:"OP-MO0030",k:["모사프리","mosapri"],s:["30정","30t"],label:"MOSAPRI TABLET 30T"},
+  {code:"OP-CF0100",k:["세파클리","cefacli"],s:["100캡","100c"],label:"CEFACLI CAPSULE 100C"},
+  {code:"OP-CF0030",k:["세파클리","cefacli"],s:["30캡","30c"],label:"CEFACLI CAPSULE 30C"},
+  {code:"OP-AM0500",k:["아목시스","amoxis"],s:["500캡","500c"],label:"AMOXIS CAPSULE 500C"},
+  {code:"OP-AM0300",k:["아목시스","amoxis"],s:["300캡","300c"],label:"AMOXIS CAPSULE 300C"},
+  {code:"OP-AM0030",k:["아목시스","amoxis"],s:["30캡","30c"],label:"AMOXIS CAPSULE 30C"},
+  {code:"OP-AC0100",k:["아목시클라","아목시콜라","amoxicla"],s:[],label:"AMOXICLA TABLET 100T"},
+  {code:"OP-AF0100",k:["아세클로페낙"],s:["100"],label:"아세클로페낙정 100T"},
+  {code:"OP-AF0030",k:["아세클로페낙"],s:["30"],label:"아세클로페낙정 30T"},
+  {code:"OP-AL0500",k:["알마펜","almafen"],s:[],label:"ALMAFEN TABLET 500T"},
+  {code:"OP-ESO0028",k:["에스오메프라졸","esomeprazole","eso"],s:[],label:"에스오메프라졸 28정"}
+];
+const AKW=MAP.flatMap(m=>m.k);
+function hpk(v){const s=String(v||'').toLowerCase();return s&&AKW.some(k=>s.includes(k));}
+const SPR=/정\(|캡슐\(|ml|포|ptp|\d+정|\d+캡/i;
+function hsp(v){return SPR.test(String(v||''));}
+function dm(n,s){const c=(n+' '+s).toLowerCase();for(const m of MAP){if(!m.k.some(k=>c.includes(k)))continue;if(!m.s.length)return m.code;if(m.s.some(x=>c.includes(x.toLowerCase())))return m.code;}return null;}
+function fv(n){if(!n)return null;const t=n.trim();if(VD[t])return{name:t,code:VD[t]};for(const[k,v]of Object.entries(VD))if(t.includes(k)||k.includes(t))return{name:k,code:v};return null;}
+
+document.getElementById('mapGrid').innerHTML=MAP.map(m=>`<div class="gi"><span class="gc">${m.code}</span><span class="gn">${m.label}</span></div>`).join('');
+document.getElementById('vendorGrid').innerHTML=Object.entries(VD).map(([n,c])=>`<div class="gi"><span class="gc">${c}</span><span class="gn">${n}</span></div>`).join('');
+function tp(id,t){const p=document.getElementById(id),el=document.getElementById(t);const o=p.style.display==='block';p.style.display=o?'none':'block';el.classList.toggle('on',!o);}
+
+/* 드래그앤드롭 */
+function doDrag(e,t){e.preventDefault();document.getElementById('drop').classList.toggle('drag',t!=='l');}
+function doDrop(e){e.preventDefault();document.getElementById('drop').classList.remove('drag');if(e.dataTransfer.files[0])runFile(e.dataTransfer.files[0]);}
+
+/* 파일 인풋 */
+function onFI(el){if(el.files[0]){runFile(el.files[0]);el.value='';}}
+
+/* ★ Ctrl+V 붙여넣기 — 브라우저에서 직접 열면 동작 */
+async function onPaste(e){
+  e.preventDefault();
+  const items=[...(e.clipboardData||{items:[]}).items];
+  const it=items.find(i=>i.type.startsWith('image/'));
+  if(!it){toast('⚠ 클립보드에 이미지가 없어요 (스크린샷 먼저 복사하세요)');return;}
+  const raw=it.getAsFile();
+  if(!raw)return;
+  const pa=document.getElementById('pa');
+  pa.classList.add('has-img');
+  pa.value='✅ 이미지 감지됨 — 분석 중...';
+  setTimeout(()=>{pa.classList.remove('has-img');pa.value='';},3000);
+  runImage(raw);
+}
+
+/* 전역 paste도 감지 (브라우저에서 열 때) */
+document.addEventListener('paste',function(e){
+  if(document.activeElement===document.getElementById('pa'))return;
+  const items=[...(e.clipboardData||{items:[]}).items];
+  const it=items.find(i=>i.type.startsWith('image/'));
+  if(it){e.preventDefault();const raw=it.getAsFile();if(raw)runImage(raw);}
+});
+
+/* 파일 라우터 */
+function runFile(file){
+  const ext=(file.name||'').split('.').pop().toLowerCase();
+  if(['xls','xlsx'].includes(ext))runXLS(file);
+  else if(ext==='pdf'||file.type==='application/pdf')runAPI(file,'application/pdf','document');
+  else if(file.type.startsWith('image/')||['png','jpg','jpeg','gif','webp'].includes(ext))runImage(file);
+  else se('지원하지 않는 형식. JPG/PNG/XLS/XLSX/PDF만 가능합니다.');
+}
+function runImage(file){
+  sl(true,'이미지 압축 중...');he();hide('result');hide('vbanner');hide('dbg');
+  compress(file).then(({blob,w,h})=>{
+    const url=URL.createObjectURL(blob);
+    document.getElementById('pimg').src=url;
+    document.getElementById('iinfo').textContent=`✅ ${w}×${h}px · ${Math.round(blob.size/1024)}KB 압축 완료`;
+    sh('pv');
+    runAPI(blob,'image/jpeg','image');
+  }).catch(e=>se('이미지 처리 실패: '+e.message));
+}
+
+/* Canvas 압축 최대 1400px JPEG 0.85 */
+function compress(blob){
+  return new Promise(r=>{
+    const img=new Image(),url=URL.createObjectURL(blob);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      const M=1400;let{width:w,height:h}=img;
+      if(w>M||h>M){if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;}}
+      const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      cv.toBlob(b=>r({blob:b,w,h}),'image/jpeg',0.85);
+    };
+    img.onerror=()=>r({blob,w:0,h:0});img.src=url;
+  });
+}
+function b64(blob){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(blob);});}
+
+/* API 호출 */
+async function runAPI(blob,mt,type){
+  sl(true,'Claude가 발주서 분석 중...');
+  let b;try{b=await b64(blob);}catch(e){sl(false);se('변환 실패: '+e.message);return;}
+  const h={'Content-Type':'application/json'};if(type==='document')h['anthropic-beta']='pdfs-2024-09-25';
+  const blk=type==='document'?{type:'document',source:{type:'base64',media_type:mt,data:b}}:{type:'image',source:{type:'base64',media_type:mt,data:b}};
+  const mpt=MAP.map(m=>`${m.code}: ${m.label} / 키=[${m.k.join('|')}] 규격=[${m.s.join('|')||'없음'}]`).join('\n');
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:h,
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,
+        system:`발주서 파싱. 거래처명과 품목(no/productName/spec/quantity) 추출, 품명+규격 조합으로 SAP 코드 매핑.\n${mpt}\n순수JSON만: {"vendor":"","items":[{"no":1,"productName":"","spec":"","quantity":0,"sapCode":"","matched":true}]}`,
+        messages:[{role:'user',content:[blk,{type:'text',text:'발주서 파싱 후 JSON 반환.'}]}]})});
+    const d=await res.json();
+    if(!res.ok||d.error)throw new Error('API 오류: '+(d.error?.message||res.status));
+    const t=d.content?.find(x=>x.type==='text')?.text||'';
+    const m=t.match(/\{[\s\S]*\}/);if(!m)throw new Error('JSON 추출 실패');
+    const p=JSON.parse(m[0]);render(p.vendor||'',p.items||[]);
+  }catch(e){se(e.message);}
+  finally{sl(false);}
+}
+
+/* Excel */
+function dCol(dr){
+  const t=dr.length;if(!t)return{nc:5,sc:12,qc:16};
+  const f=dr[0];let qc=16;
+  for(let c=f.length-1;c>=3;c--){if(dr.every(r=>typeof r[c]==='number'&&r[c]>=0)&&dr.some(r=>r[c]>0)){qc=c;break;}}
+  let nc=5,bn=0;for(let c=2;c<qc;c++){const v=dr.map(r=>String(r[c]||'').trim()).filter(v=>v&&!/^\d{6,}$/.test(v));if(!v.length)continue;const s=v.filter(x=>hpk(x)).length/t;if(s>bn){bn=s;nc=c;}}
+  let sc=nc+1,bs=0;for(let c=nc+1;c<qc;c++){const v=dr.map(r=>String(r[c]||'').trim()).filter(v=>v);if(!v.length)continue;const s=v.filter(x=>hsp(x)).length/t;if(s>bs){bs=s;sc=c;}}
+  return{nc,sc,qc};
+}
+async function runXLS(file){
+  sl(true,'Excel 파싱 중...');he();hide('result');hide('vbanner');hide('dbg');
+  try{
+    const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
+    const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    let vr='';for(let r=0;r<Math.min(6,raw.length);r++){const v=String(raw[r][0]||'').trim();if(v&&v!=='No'&&!/^발/.test(v)&&!/^PU/.test(v)&&!/^구매/.test(v)&&!/^입고/.test(v)){vr=v;break;}}
+    const dr=raw.filter(row=>{const n=row[0];return typeof n==='number'&&Number.isInteger(n)&&n>=1&&n<=999;});
+    if(!dr.length)throw new Error('데이터 행을 찾을 수 없습니다.');
+    const{nc,sc,qc}=dCol(dr);
+    document.getElementById('dbgc').textContent=`품명 col[${nc}]="${String(dr[0][nc]||'').trim()}"  |  규격 col[${sc}]="${String(dr[0][sc]||'').trim()}"  |  수량 col[${qc}]=${dr[0][qc]}`;
+    sh('dbg');
+    const ex=dr.map(row=>{const nm=String(row[nc]||'').trim(),sp=String(row[sc]||'').trim(),qty=Number(row[qc])||0;const sap=dm(nm,sp);return{no:row[0],productName:nm,spec:sp,quantity:qty,sapCode:sap||'미매핑',matched:!!sap};});
+    const um=ex.filter(e=>!e.matched);
+    if(um.length){sl(true,`미매핑 ${um.length}개 → Claude 재매핑 중...`);await cr(ex,um);}
+    render(vr,ex);
+  }catch(e){se(e.message);}finally{sl(false);}
+}
+async function cr(all,um){
+  const mpt=MAP.map(m=>`${m.code}: 키=[${m.k.join('|')}] 규격=[${m.s.join('|')||'없음'}]`).join('\n');
+  const pr=`미매핑 품목 SAP 코드.\n${mpt}\n\n미매핑:\n`+um.map(u=>`no:${u.no} 품명:"${u.productName}" 규격:"${u.spec}"`).join('\n')+`\n\n순수JSON만:\n[{"no":1,"sapCode":"OP-XX"}]`;
+  try{const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,messages:[{role:'user',content:pr}]})});const d=await res.json();const t=d.content?.find(b=>b.type==='text')?.text||'';const m=t.match(/\[[\s\S]*\]/);if(!m)return;JSON.parse(m[0]).forEach(r=>{const it=all.find(a=>a.no===r.no);if(it&&r.sapCode&&r.sapCode!=='미매핑'){it.sapCode=r.sapCode;it.matched=true;}});}catch(_){}
+}
+
+function isC(r){return CHXC.has(r.sapCode);}
+let rows=[],cv=null;
+function render(vr,its){
+  rows=its;cv=fv(vr);
+  document.getElementById('vbanner').style.display='flex';
+  document.getElementById('vname').textContent=cv?.name||vr||'거래처 미인식';
+  document.getElementById('vcode').innerHTML=cv?`<span class="vcode">${cv.code}</span>`:`<span class="vunk">⚠ 미등록 거래처</span>`;
+  const ok=its.filter(i=>i.matched).length,um=its.length-ok;
+  document.getElementById('meta').textContent=`총 ${its.length}개 · ${ok}개 매핑 완료`;
+  const wbd=document.getElementById('wb');if(um>0){wbd.style.display='block';wbd.textContent=`⚠ 미매핑 ${um}개`;}else wbd.style.display='none';
+  document.getElementById('oc').textContent=`${its.filter(r=>r.matched&&!isC(r)).length}개`;
+  document.getElementById('cc').textContent=`${its.filter(r=>r.matched&&isC(r)).length}개`;
+  document.getElementById('tbody').innerHTML=its.map((it,i)=>{const c=isC(it);return`<tr class="${c?'chx':''}"><td class="no-col">${it.no}</td><td>${it.productName}${c?'<span class="chxtag">CHX</span>':''}</td><td style="font-size:12px;color:#64748b">${it.spec||'-'}</td><td class="qty-col">${it.quantity}</td><td><div class="sap-cell"><span class="sap ${it.matched?(c?'cs':''):'ms'}">${it.sapCode}</span><span class="cbtn ${it.matched?'':'dis'}" id="cb${i}" onclick="cpcode('${it.sapCode}',${i})">⎘</span></div></td><td class="status">${it.matched?'✅':'❌'}</td></tr>`;}).join('');
+  sh('result');
+}
+function gt(s,m){return m==='code'?s.map(r=>r.sapCode).join('\n'):m==='qty'?s.map(r=>r.quantity).join('\n'):s.map(r=>`${r.sapCode}\t${r.quantity}`).join('\n');}
+function fl(id){const b=document.getElementById(id);if(!b)return;b.classList.add('fl');setTimeout(()=>b.classList.remove('fl'),1100);}
+function co(m){const s=rows.filter(r=>r.matched&&!isC(r));navigator.clipboard.writeText(gt(s,m)).then(()=>{fl(`bo${m[0]}`);toast(`💊 경구제 ${s.length}개 복사!`);});}
+function cx(m){const s=rows.filter(r=>r.matched&&isC(r));navigator.clipboard.writeText(gt(s,m)).then(()=>{fl(`bc${m[0]}`);toast(`🧴 CHX ${s.length}개 복사!`);});}
+function ca(){const vh=cv?`거래처: ${cv.name} (${cv.code})\n\n`:'';const hd='No\t품명\t규격\t수량\tSAP코드';const bd=rows.map(r=>`${r.no}\t${r.productName}\t${r.spec||''}\t${r.quantity}\t${r.sapCode}`);navigator.clipboard.writeText(vh+[hd,...bd].join('\n')).then(()=>{fl('ball');toast('📊 전체 복사!');});}
+function cpcode(code,i){if(code==='미매핑')return;navigator.clipboard.writeText(code).then(()=>{const b=document.getElementById(`cb${i}`);b.textContent='✓';b.classList.add('done');setTimeout(()=>{b.textContent='⎘';b.classList.remove('done');},1400);});}
+function cpVendor(){if(!cv){toast('⚠ 미등록 거래처');return;}navigator.clipboard.writeText(String(cv.code)).then(()=>toast(`📋 ${cv.code} 복사!`));}
+function reset(){hide('result');hide('vbanner');hide('dbg');hide('pv');he();rows=[];cv=null;document.getElementById('pimg').src='';document.getElementById('pa').value='';}
+function sl(v,msg){document.getElementById('loader').style.display=v?'block':'none';if(msg)document.getElementById('lmsg').textContent=msg;}
+function sh(id){const e=document.getElementById(id);e.style.display=id==='vbanner'?'flex':'block';}
+function hide(id){document.getElementById(id).style.display='none';}
+function he(){document.getElementById('err').style.display='none';}
+function se(msg,det){document.getElementById('emsg').textContent='❌ '+msg;const d=document.getElementById('edet');if(det){d.textContent=det;d.style.display='block';}else d.style.display='none';document.getElementById('err').style.display='block';}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
+</script>
+</body>
+</html>
