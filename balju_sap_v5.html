@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'IBM Plex Sans KR',sans-serif;background:#f0f2f5;min-height:100vh;padding:20px 14px;color:#1a1a2e}
+  .wrap{max-width:900px;margin:0 auto}
+  .hdr{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .hdr-ico{width:40px;height:40px;background:#1a3a5c;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .hdr-text h1{font-size:17px;font-weight:600}
+  .hdr-text p{font-size:11px;color:#777;margin-top:2px}
+  .toggles{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .tog{font-size:12px;color:#1a3a5c;cursor:pointer;background:white;border:1px solid #d0d8e4;border-radius:6px;padding:5px 11px;user-select:none;transition:all .15s}
+  .tog:hover,.tog.active{background:#e6eef7;border-color:#1a3a5c}
+  .panel{background:white;border-radius:10px;padding:13px 15px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);display:none}
+  .panel h3{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-bottom:9px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:5px}
+  .grid3{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:5px}
+  .gi{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:5px;background:#f7f8fa}
+  .gi .gc{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#1a3a5c;font-weight:500;min-width:90px}
+  .gi .gn{color:#555;font-size:11px}
+  .drop{border:2px dashed #c5cdd6;border-radius:12px;background:white;padding:28px 20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:10px}
+  .drop:hover,.drop.drag{border-color:#1a3a5c;background:#eef3f8}
+  .drop input{display:none}
+  .drop-ico{font-size:30px;margin-bottom:8px}
+  .drop-lbl{font-size:14px;font-weight:500;color:#333;margin-bottom:3px}
+  .drop-sub{font-size:11px;color:#aaa}
+  .loader{background:white;border-radius:12px;padding:24px;text-align:center;display:none;margin-bottom:10px}
+  .spin{width:28px;height:28px;border:3px solid #e0e6ee;border-top-color:#1a3a5c;border-radius:50%;animation:sp .7s linear infinite;margin:0 auto 10px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .load-msg{font-size:13px;color:#666}
+  .err-box{background:#fff2f0;border:1px solid #ffc5be;border-radius:8px;padding:11px 14px;color:#c0392b;font-size:13px;display:none;margin-bottom:10px}
+  .err-detail{font-family:'IBM Plex Mono',monospace;font-size:11px;background:#f9f0ef;padding:8px;border-radius:5px;margin-top:6px;max-height:80px;overflow-y:auto;white-space:pre-wrap;display:none}
+
+  /* 디버그 패널 */
+  .debug-panel{background:#fffbf0;border:1px solid #f0d080;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:12px;display:none}
+  .debug-panel h4{font-size:11px;font-weight:600;color:#a0740a;margin-bottom:6px}
+  .debug-panel code{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#555}
+
+  /* 거래처 배너 */
+  .vendor-banner{background:white;border-radius:10px;border:1px solid #e0e8f0;padding:12px 16px;margin-bottom:10px;display:none;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .vb-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .vb-name{font-size:16px;font-weight:600}
+  .vb-code{font-family:'IBM Plex Mono',monospace;font-size:16px;color:#1a3a5c;background:#e6eef7;padding:5px 14px;border-radius:7px;font-weight:600;letter-spacing:.5px}
+  .vb-unknown{font-size:13px;color:#e67e22;background:#fef9f0;padding:4px 12px;border-radius:6px}
+  .btn-cv{background:#1a3a5c;color:white;border:none;border-radius:6px;padding:7px 15px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:500}
+  .btn-cv:hover{background:#112840}
+
+  .result{background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.09);display:none;margin-bottom:10px}
+  .res-hdr{background:#1a3a5c;color:white;padding:11px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
+  .res-meta{font-size:12px;opacity:.7;margin-top:2px}
+  .warn-badge{background:#e74c3c;color:white;padding:2px 10px;border-radius:20px;font-size:11px;display:none}
+  table{width:100%;border-collapse:collapse}
+  thead tr{background:#f4f6f9}
+  th{padding:8px 13px;text-align:left;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #e8ecf0}
+  td{padding:9px 13px;font-size:13px;border-bottom:1px solid #f2f4f6;color:#2d2d2d;vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover td{background:#fafbfc}
+  .no-col{color:#bbb;font-size:11px}
+  .qty-col{font-weight:600;text-align:center}
+  .sap{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;color:#1a3a5c;background:#e6eef7;padding:3px 8px;border-radius:4px;white-space:nowrap}
+  .sap.miss{color:#c0392b;background:#fdf0ee}
+  .status{text-align:center;font-size:14px}
+  .actions{display:flex;gap:8px;padding:11px 16px;background:#f7f8fa;border-top:1px solid #eaeef2;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;font-family:inherit;transition:background .15s}
+  .btn-blue{background:#1a3a5c;color:white}.btn-blue:hover{background:#112840}
+  .btn-green{background:#27ae60;color:white}.btn-green:hover{background:#1e8e4e}
+  .btn-ghost{background:white;color:#444;border:1px solid #d8dde4}.btn-ghost:hover{background:#f4f6f8}
+  .toast{position:fixed;bottom:16px;right:16px;background:#1a1a2e;color:white;padding:9px 16px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9999}
+  .toast.on{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="hdr-ico">📋</div>
+    <div class="hdr-text">
+      <h1>발주서 → SAP 코드 변환기</h1>
+      <p>거래처 코드 자동 인식 · 품목+규격 매핑 · SAP 입력용 복사</p>
+    </div>
+  </div>
+
+  <div class="toggles">
+    <span class="tog" id="tog-map" onclick="togglePanel('mapPanel','tog-map')">📦 품목 매핑표 (18개)</span>
+    <span class="tog" id="tog-ven" onclick="togglePanel('vendorPanel','tog-ven')">🏢 거래처 코드표 (34개)</span>
+  </div>
+  <div class="panel" id="mapPanel">
+    <h3>SAP 품목 코드 매핑 (품명 + 규격 조합)</h3>
+    <div class="grid2" id="mapGrid"></div>
+  </div>
+  <div class="panel" id="vendorPanel">
+    <h3>거래처 코드 목록</h3>
+    <div class="grid3" id="vendorGrid"></div>
+  </div>
+
+  <div class="drop" id="drop">
+    <input type="file" id="fi" accept=".xls,.xlsx,.pdf,.png,.jpg,.jpeg">
+    <div class="drop-ico">📁</div>
+    <div class="drop-lbl">발주서 파일을 여기에 드래그하거나 클릭</div>
+    <div class="drop-sub">XLS · XLSX · PDF · JPG · PNG</div>
+  </div>
+
+  <div class="loader" id="loader"><div class="spin"></div><div class="load-msg" id="loadMsg">처리 중...</div></div>
+  <div class="err-box" id="errBox"><span id="errMsg"></span><div class="err-detail" id="errDetail"></div></div>
+
+  <!-- 컬럼 탐지 결과 디버그 -->
+  <div class="debug-panel" id="debugPanel">
+    <h4>🔍 컬럼 자동 탐지 결과</h4>
+    <code id="debugInfo"></code>
+  </div>
+
+  <div class="vendor-banner" id="vendorBanner">
+    <div class="vb-left">
+      <div class="vb-name" id="vbName"></div>
+      <div id="vbCode"></div>
+    </div>
+    <button class="btn-cv" onclick="copyVendor()">📋 거래처 코드 복사</button>
+  </div>
+
+  <div class="result" id="result">
+    <div class="res-hdr">
+      <div>
+        <div style="font-size:14px;font-weight:600">품목 목록</div>
+        <div class="res-meta" id="meta"></div>
+      </div>
+      <div class="warn-badge" id="warnBadge"></div>
+    </div>
+    <table>
+      <thead><tr>
+        <th style="width:32px">No</th>
+        <th>품명</th>
+        <th>규격</th>
+        <th style="width:60px;text-align:center">수량</th>
+        <th style="width:130px">SAP 코드</th>
+        <th style="width:38px;text-align:center">✓</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="actions">
+      <button class="btn btn-blue"  onclick="copySAP()">📋 품목 코드+수량 복사</button>
+      <button class="btn btn-green" onclick="copyAll()">📊 전체 표 복사</button>
+      <button class="btn btn-ghost" onclick="reset()">🔄 새 파일</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const VENDORS = {
+  "백제약품":926542,"지오영":928319,"복산나이스":550528,"경동사":936746,
+  "인천약품":929285,"광주지오팜":928916,"대구지오팜":927196,"대전지오팜":927957,
+  "서울지오팜":931410,"김약품":929208,"동원약품":928320,"대전동원약품":948154,
+  "동원헬스케어":948156,"동원아이팜":948155,"훼밀리팜":945619,"백광약품":948494,
+  "서울약사신협":927198,"세화약품":933364,"신덕약품":935437,"우정약품":930275,
+  "유진약품":928917,"태전약품":927212,"티제이팜":929483,"연성약품":940143,
+  "아이팜코리아":930134,"수정약품":939268,"이엠디":918682,"우분트팜":943287,
+  "프리모":939767,"선메디텍":944081,"에스팜":940899,"비엘팜":941675,
+  "성도약품":939568,"가온약품":933982
+};
+
+function findVendor(name) {
+  if (!name) return null;
+  const n = name.trim();
+  if (VENDORS[n]) return {name:n, code:VENDORS[n]};
+  for (const [k,v] of Object.entries(VENDORS))
+    if (n.includes(k) || k.includes(n)) return {name:k, code:v};
+  return null;
+}
+
+/* ── 품목 매핑 (큰 숫자 먼저, 검증 완료) ── */
+const MAP = [
+  {code:"CHLOR100",   k:["클로르헥시딘","chlorhexidine","chx"],      s:["100ml","100mL","10ea"],           label:"클로르헥시딘액 100ML"},
+  {code:"CHLOR015",   k:["클로르헥시딘","chlorhexidine","chx"],      s:["15ml","15mL","15포","6포","6ea"],  label:"클로르헥시딘액 15ML"},
+  {code:"OP-NA0300",  k:["나프록소","naproxo","naproxen"],           s:["300정","300t"],                   label:"NAPROXO TABLET 300T"},
+  {code:"OP-NA0030",  k:["나프록소","naproxo","naproxen"],           s:["30정","30t"],                     label:"오스템 나프록소 30정"},
+  {code:"OP-LO0500",  k:["록소리펜","록소리렌","loxolifen"],          s:["500정","500t"],                   label:"LOXOLIFEN TABLET 500T"},
+  {code:"OP-LO0030",  k:["록소리펜","록소리렌","loxolifen"],          s:["30정","30t"],                     label:"LOXOLIFEN TABLET 30T"},
+  {code:"OP-MO0100",  k:["모사프리","mosapri"],                      s:["100정","100t"],                   label:"모사프리정 100T"},
+  {code:"OP-MO0030",  k:["모사프리","mosapri"],                      s:["30정","30t"],                     label:"MOSAPRI TABLET 30T"},
+  {code:"OP-CF0100",  k:["세파클리","cefacli"],                      s:["100캡","100c"],                   label:"CEFACLI CAPSULE 100C"},
+  {code:"OP-CF0030",  k:["세파클리","cefacli"],                      s:["30캡","30c"],                     label:"CEFACLI CAPSULE 30C"},
+  {code:"OP-AM0500",  k:["아목시스","amoxis"],                       s:["500캡","500c"],                   label:"AMOXIS CAPSULE 500C"},
+  {code:"OP-AM0300",  k:["아목시스","amoxis"],                       s:["300캡","300c"],                   label:"AMOXIS CAPSULE 300C"},
+  {code:"OP-AM0030",  k:["아목시스","amoxis"],                       s:["30캡","30c"],                     label:"AMOXIS CAPSULE 30C"},
+  {code:"OP-AC0100",  k:["아목시클라","아목시콜라","amoxicla"],        s:[],                                label:"AMOXICLA TABLET 100T"},
+  {code:"OP-AF0100",  k:["아세클로페낙"],                             s:["100"],                           label:"아세클로페낙정 100T"},
+  {code:"OP-AF0030",  k:["아세클로페낙"],                             s:["30"],                            label:"아세클로페낙정 30T"},
+  {code:"OP-AL0500",  k:["알마펜","almafen"],                        s:[],                                label:"ALMAFEN TABLET 500T"},
+  {code:"OP-ESO0028", k:["에스오메프라졸","esomeprazole","eso"],      s:[],                                label:"에스오메프라졸 28정"},
+];
+
+const ALL_KW = MAP.flatMap(m=>m.k);
+function hasProductKw(val){ const v=String(val||'').toLowerCase(); return v&&ALL_KW.some(k=>v.includes(k)); }
+
+/* 규격 패턴: 정(병), 캡슐(병), mL, PTP, 포 등 */
+const SPEC_RE = /정\(|캡슐\(|ml|mL|포|ptp|\d+정|\d+캡/i;
+function hasSpecPattern(val){ return SPEC_RE.test(String(val||'')); }
+
+function doMap(name, spec) {
+  const c = (name + ' ' + spec).toLowerCase();
+  for (const m of MAP) {
+    if (!m.k.some(k => c.includes(k))) continue;
+    if (!m.s.length) return m.code;
+    if (m.s.some(s => c.includes(s.toLowerCase()))) return m.code;
+  }
+  return null;
+}
+
+/* ── 컬럼 탐지 (v5: 실제 데이터 검증 기반) ── */
+function detectColumns(dataRows) {
+  const total = dataRows.length;
+  if (!total) return {nameCol:5, specCol:12, qtyCol:16};
+
+  /* 1. 수량: 끝에서 양의 정수 컬럼 */
+  let qtyCol = 16;
+  const fd = dataRows[0];
+  for (let c=fd.length-1; c>=3; c--) {
+    const allNum = dataRows.every(r=>typeof r[c]==='number' && r[c]>=0);
+    const hasPos = dataRows.some(r=>typeof r[c]==='number' && r[c]>0);
+    if (allNum && hasPos) { qtyCol=c; break; }
+  }
+
+  /* 2. 품명: MAP 키워드 매칭 비율이 가장 높은 컬럼 */
+  let nameCol=5, bestNameScore=0;
+  for (let c=2; c<qtyCol; c++) {
+    const vals = dataRows.map(r=>String(r[c]||'').trim()).filter(v=>v&&!/^\d{6,}$/.test(v));
+    if (!vals.length) continue;
+    const score = vals.filter(v=>hasProductKw(v)).length / total;
+    if (score > bestNameScore) { bestNameScore=score; nameCol=c; }
+  }
+
+  /* 3. 규격: 품명 이후에서 규격 패턴 비율이 가장 높은 컬럼 */
+  let specCol = nameCol+1, bestSpecScore=0;
+  for (let c=nameCol+1; c<qtyCol; c++) {
+    const vals = dataRows.map(r=>String(r[c]||'').trim()).filter(v=>v);
+    if (!vals.length) continue;
+    const score = vals.filter(v=>hasSpecPattern(v)).length / total;
+    if (score > bestSpecScore) { bestSpecScore=score; specCol=c; }
+  }
+
+  return {nameCol, specCol, qtyCol};
+}
+
+/* 패널 렌더 */
+document.getElementById('mapGrid').innerHTML =
+  MAP.map(m=>`<div class="gi"><span class="gc">${m.code}</span><span class="gn">${m.label}</span></div>`).join('');
+document.getElementById('vendorGrid').innerHTML =
+  Object.entries(VENDORS).map(([n,c])=>`<div class="gi"><span class="gc">${c}</span><span class="gn">${n}</span></div>`).join('');
+
+function togglePanel(id,togId){
+  const p=document.getElementById(id),t=document.getElementById(togId);
+  const open=p.style.display==='block';
+  p.style.display=open?'none':'block';
+  t.classList.toggle('active',!open);
+}
+
+let rows=[], currentVendor=null;
+const drop=document.getElementById('drop'), fi=document.getElementById('fi');
+drop.addEventListener('click',()=>fi.click());
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag')});
+drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag');if(e.dataTransfer.files[0])run(e.dataTransfer.files[0])});
+fi.addEventListener('change',e=>{if(e.target.files[0])run(e.target.files[0])});
+
+async function run(file) {
+  setLoad(true,'파일 읽는 중...'); hideErr(); hide('result'); hide('vendorBanner'); hide('debugPanel');
+  try {
+    const ext=file.name.split('.').pop().toLowerCase();
+    if(['xls','xlsx'].includes(ext))            await parseExcel(file);
+    else if(ext==='pdf')                        await parseMedia(file,'application/pdf','document');
+    else if(['png','jpg','jpeg'].includes(ext)) await parseMedia(file,ext==='jpg'?'image/jpeg':`image/${ext}`,'image');
+    else throw new Error('XLS / XLSX / PDF / JPG / PNG 파일만 지원합니다.');
+  } catch(e){ showErr(e.message, e.cause||''); }
+  finally{ setLoad(false); }
+}
+
+async function parseExcel(file) {
+  setLoad(true,'Excel 파싱 중...');
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+
+  /* 거래처명 */
+  let vendorRaw='';
+  for(let r=0;r<Math.min(6,raw.length);r++){
+    const v=String(raw[r][0]||'').trim();
+    if(v&&v!=='No'&&!/^발/.test(v)&&!/^PU/.test(v)&&!/^구매/.test(v)&&!/^입고/.test(v)){vendorRaw=v;break;}
+  }
+
+  /* 데이터 행 */
+  const dataRows=raw.filter(row=>{
+    const n=row[0];
+    return typeof n==='number'&&Number.isInteger(n)&&n>=1&&n<=999;
+  });
+  if(!dataRows.length) throw new Error('데이터 행을 찾을 수 없습니다.');
+
+  /* 컬럼 탐지 */
+  const {nameCol, specCol, qtyCol} = detectColumns(dataRows);
+
+  /* 디버그 패널 표시 */
+  document.getElementById('debugInfo').textContent =
+    `품명 col[${nameCol}]="${String(dataRows[0][nameCol]||'').trim()}"  |  규격 col[${specCol}]="${String(dataRows[0][specCol]||'').trim()}"  |  수량 col[${qtyCol}]=${dataRows[0][qtyCol]}`;
+  show('debugPanel');
+
+  const extracted=dataRows.map(row=>{
+    const nm=String(row[nameCol]||'').trim();
+    const sp=String(row[specCol]||'').trim();
+    const qty=Number(row[qtyCol])||0;
+    const sap=doMap(nm,sp);
+    return{no:row[0], productName:nm, spec:sp, quantity:qty, sapCode:sap||'미매핑', matched:!!sap};
+  });
+
+  /* 미매핑 → Claude 재매핑 */
+  const unmatched=extracted.filter(e=>!e.matched);
+  if(unmatched.length){
+    setLoad(true,`미매핑 ${unmatched.length}개 → Claude 재매핑 중...`);
+    await claudeRemap(extracted,unmatched);
+  }
+
+  render(vendorRaw, extracted);
+}
+
+async function claudeRemap(all, unmatched) {
+  const mapTxt=MAP.map(m=>`${m.code}: 키=[${m.k.join('|')}] 규격=[${m.s.join('|')||'없음'}]`).join('\n');
+  const prompt=`미매핑 품목에 SAP 코드를 찾아주세요.\n\n매핑표:\n${mapTxt}\n\n미매핑:\n`
+    +unmatched.map(u=>`no:${u.no} 품명:"${u.productName}" 규격:"${u.spec}"`).join('\n')
+    +`\n\n순수 JSON만:\n[{"no":1,"sapCode":"OP-XX"}]`;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
+        messages:[{role:'user',content:prompt}]})});
+    const data=await res.json();
+    const txt=data.content?.find(b=>b.type==='text')?.text||'';
+    const m=txt.match(/\[[\s\S]*\]/);
+    if(!m)return;
+    JSON.parse(m[0]).forEach(r=>{
+      const it=all.find(a=>a.no===r.no);
+      if(it&&r.sapCode&&r.sapCode!=='미매핑'){it.sapCode=r.sapCode;it.matched=true;}
+    });
+  }catch(_){}
+}
+
+async function parseMedia(file,mt,type){
+  setLoad(true,type==='document'?'PDF 분석 중...':'이미지 분석 중...');
+  const b64=await toB64(file);
+  const hdrs={'Content-Type':'application/json'};
+  if(type==='document')hdrs['anthropic-beta']='pdfs-2024-09-25';
+  const blk=type==='document'
+    ?{type:'document',source:{type:'base64',media_type:mt,data:b64}}
+    :{type:'image',source:{type:'base64',media_type:mt,data:b64}};
+  const mapTxt=MAP.map(m=>`${m.code}: ${m.label} / 키=[${m.k.join('|')}] 규격=[${m.s.join('|')||'없음'}]`).join('\n');
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:hdrs,
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,
+      system:`발주서 파싱 전문가. 거래처명과 품목(no/productName/spec/quantity)을 추출, 품명+규격 조합으로 SAP 코드 매핑.\n${mapTxt}\n순수JSON: {"vendor":"","items":[{"no":1,"productName":"","spec":"","quantity":0,"sapCode":"","matched":true}]}`,
+      messages:[{role:'user',content:[blk,{type:'text',text:'발주서를 파싱해서 JSON 반환.'}]}]})});
+  const data=await res.json();
+  if(!res.ok||data.error)throw new Error('API 오류: '+(data.error?.message||res.status),{cause:JSON.stringify(data).slice(0,300)});
+  const txt=data.content?.find(b=>b.type==='text')?.text||'';
+  const m=txt.match(/\{[\s\S]*\}/);
+  if(!m)throw new Error('JSON 추출 실패',{cause:txt.slice(0,200)});
+  const p=JSON.parse(m[0]);
+  render(p.vendor||'',p.items||[]);
+}
+
+function render(vendorRaw, its) {
+  rows=its;
+  currentVendor=findVendor(vendorRaw);
+  const banner=document.getElementById('vendorBanner');
+  banner.style.display='flex';
+  document.getElementById('vbName').textContent=currentVendor?.name||vendorRaw||'거래처 미인식';
+  document.getElementById('vbCode').innerHTML=currentVendor
+    ?`<span class="vb-code">${currentVendor.code}</span>`
+    :`<span class="vb-unknown">⚠ 미등록 거래처</span>`;
+
+  const ok=its.filter(i=>i.matched).length;
+  document.getElementById('meta').textContent=`총 ${its.length}개 품목 · ${ok}개 매핑 완료`;
+  const um=its.length-ok;
+  const wb=document.getElementById('warnBadge');
+  if(um>0){wb.style.display='block';wb.textContent=`⚠ 미매핑 ${um}개`;}
+  else wb.style.display='none';
+
+  document.getElementById('tbody').innerHTML=its.map(it=>`
+    <tr>
+      <td class="no-col">${it.no}</td>
+      <td>${it.productName}</td>
+      <td style="color:#555;font-size:12px;font-weight:500">${it.spec||'-'}</td>
+      <td class="qty-col">${it.quantity}</td>
+      <td><span class="sap ${it.matched?'':'miss'}">${it.sapCode}</span></td>
+      <td class="status">${it.matched?'✅':'❌'}</td>
+    </tr>`).join('');
+  show('result');
+}
+
+function copyVendor(){
+  if(!currentVendor){toast('⚠ 등록된 거래처 코드가 없습니다.');return;}
+  navigator.clipboard.writeText(String(currentVendor.code)).then(()=>toast(`📋 ${currentVendor.code} 복사 완료!`));
+}
+function copySAP(){
+  navigator.clipboard.writeText(rows.map(r=>`${r.sapCode}\t${r.quantity}`).join('\n')).then(()=>toast('📋 품목 코드+수량 복사 완료!'));
+}
+function copyAll(){
+  const vh=currentVendor?`거래처: ${currentVendor.name} (${currentVendor.code})\n\n`:'';
+  const hd='No\t품명\t규격\t수량\tSAP코드';
+  const bd=rows.map(r=>`${r.no}\t${r.productName}\t${r.spec||''}\t${r.quantity}\t${r.sapCode}`);
+  navigator.clipboard.writeText(vh+[hd,...bd].join('\n')).then(()=>toast('📊 전체 복사 완료!'));
+}
+function reset(){hide('result');hide('vendorBanner');hide('debugPanel');hideErr();fi.value='';rows=[];currentVendor=null;}
+function toB64(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(f)});}
+function setLoad(v,msg){document.getElementById('loader').style.display=v?'block':'none';if(msg)document.getElementById('loadMsg').textContent=msg;}
+function show(id){const e=document.getElementById(id);e.style.display=id==='vendorBanner'?'flex':'block';}
+function hide(id){document.getElementById(id).style.display='none';}
+function hideErr(){document.getElementById('errBox').style.display='none';}
+function showErr(msg,det){
+  document.getElementById('errMsg').textContent='❌ '+msg;
+  const d=document.getElementById('errDetail');
+  if(det){d.textContent=det;d.style.display='block';}else d.style.display='none';
+  document.getElementById('errBox').style.display='block';
+}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
+</script>
+</body>
+</html>
