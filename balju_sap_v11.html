@@ -1,0 +1,344 @@
+
+<h2 class="sr-only">발주서 SAP 코드 변환기</h2>
+<style>
+.w{font-family:var(--font-sans);max-width:900px}
+.hdr{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.hdr-ico{width:38px;height:38px;background:#1a3a5c;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.hdr h1{font-size:16px;font-weight:500;color:var(--color-text-primary);margin:0}
+.hdr p{font-size:11px;color:var(--color-text-secondary);margin:2px 0 0}
+.toggles{display:flex;gap:7px;margin-bottom:10px;flex-wrap:wrap}
+.tog{font-size:12px;cursor:pointer;background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:5px 10px;color:var(--color-text-secondary)}
+.tog:hover,.tog.on{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info)}
+.panel{background:var(--color-background-primary);border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-tertiary);padding:12px 14px;margin-bottom:10px;display:none}
+.panel h3{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:4px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px}
+.gi{display:flex;align-items:center;gap:6px;padding:4px 7px;border-radius:5px;background:var(--color-background-secondary)}
+.gi .gc{font-family:var(--font-mono);font-size:11px;color:var(--color-text-info);font-weight:500;min-width:88px}
+.gi .gn{font-size:11px;color:var(--color-text-secondary)}
+
+/* 업로드 존 2분할 */
+.upload-area{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.zone{border:1.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-lg);background:var(--color-background-primary);padding:22px 14px;text-align:center;cursor:pointer;transition:all .2s}
+.zone:hover{border-color:#1a3a5c;background:var(--color-background-secondary)}
+.zone.active{border-color:#27ae60;background:var(--color-background-success);border-style:solid}
+.zone input{display:none}
+.zone .ico{font-size:26px;margin-bottom:7px}
+.zone .lbl{font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:3px}
+.zone .sub{font-size:11px;color:var(--color-text-tertiary)}
+/* 붙여넣기 존 특별 스타일 */
+.paste-zone{position:relative;outline:none}
+.paste-zone .kbd-row{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:6px}
+.kbd{background:#1a3a5c;color:#fff;border-radius:3px;padding:1px 6px;font-family:var(--font-mono);font-size:11px;font-weight:600}
+/* 숨겨진 paste 수신 textarea */
+#paste-target{position:absolute;opacity:0;width:100%;height:100%;top:0;left:0;cursor:pointer;resize:none;border:none;background:transparent;outline:none;font-size:1px;color:transparent}
+
+.preview{background:var(--color-background-primary);border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-tertiary);padding:11px 13px;margin-bottom:10px;display:none}
+.preview h4{font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:7px}
+.preview img{max-width:100%;max-height:160px;border-radius:6px;border:0.5px solid var(--color-border-tertiary);display:block}
+.iinfo{font-size:11px;color:var(--color-text-success);margin-top:4px;font-family:var(--font-mono)}
+.loader{background:var(--color-background-primary);border-radius:var(--border-radius-lg);padding:22px;text-align:center;display:none;margin-bottom:10px}
+.spin{width:26px;height:26px;border:2.5px solid var(--color-border-tertiary);border-top-color:#1a3a5c;border-radius:50%;animation:sp .7s linear infinite;margin:0 auto 9px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.lmsg{font-size:13px;color:var(--color-text-secondary)}
+.err{background:var(--color-background-danger);border:0.5px solid var(--color-border-danger);border-radius:var(--border-radius-md);padding:10px 13px;color:var(--color-text-danger);font-size:13px;display:none;margin-bottom:10px}
+.edet{font-family:var(--font-mono);font-size:11px;background:var(--color-background-secondary);padding:7px;border-radius:5px;margin-top:6px;max-height:90px;overflow-y:auto;white-space:pre-wrap;display:none}
+.dbg{background:var(--color-background-warning);border:0.5px solid var(--color-border-warning);border-radius:var(--border-radius-md);padding:9px 13px;margin-bottom:10px;font-size:12px;display:none}
+.dbg h4{font-size:11px;font-weight:500;color:var(--color-text-warning);margin-bottom:4px}
+.vbanner{background:var(--color-background-primary);border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-tertiary);padding:11px 15px;margin-bottom:10px;display:none;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px}
+.vb-left{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.vname{font-size:15px;font-weight:500;color:var(--color-text-primary)}
+.vcode{font-family:var(--font-mono);font-size:15px;color:var(--color-text-info);background:var(--color-background-info);padding:4px 12px;border-radius:var(--border-radius-md);font-weight:500;letter-spacing:.4px}
+.vunk{font-size:12px;color:var(--color-text-warning);background:var(--color-background-warning);padding:3px 10px;border-radius:var(--border-radius-md)}
+.result{background:var(--color-background-primary);border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-tertiary);overflow:hidden;display:none;margin-bottom:10px}
+.res-hdr{background:#1a3a5c;color:#fff;padding:10px 15px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px}
+.res-hdr .title{font-size:14px;font-weight:500}
+.res-hdr .meta{font-size:11px;opacity:.75;margin-top:1px}
+.wbadge{background:#e74c3c;color:#fff;padding:2px 9px;border-radius:20px;font-size:11px;display:none}
+table{width:100%;border-collapse:collapse}
+thead tr{background:var(--color-background-secondary)}
+th{padding:7px 12px;text-align:left;font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.4px;border-bottom:0.5px solid var(--color-border-tertiary)}
+td{padding:8px 12px;font-size:13px;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-primary);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--color-background-secondary)}
+tbody tr.chx td{background:var(--color-background-success)}
+.chxtag{font-size:10px;background:#0e7c7b;color:#fff;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:500;vertical-align:middle}
+.no-col{color:var(--color-text-tertiary);font-size:11px}
+.qty-col{font-weight:500;text-align:center}
+.sc{display:flex;align-items:center;gap:6px}
+.sap{font-family:var(--font-mono);font-size:12px;font-weight:500;color:var(--color-text-info);background:var(--color-background-info);padding:2px 7px;border-radius:4px;white-space:nowrap}
+.sap.cs{color:var(--color-text-success);background:var(--color-background-success)}
+.sap.ms{color:var(--color-text-danger);background:var(--color-background-danger)}
+.cbtn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:22px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-secondary);border-radius:4px;cursor:pointer;font-size:12px;color:var(--color-text-secondary);transition:all .15s;flex-shrink:0;user-select:none}
+.cbtn:hover{background:#1a3a5c;color:#fff;border-color:#1a3a5c}
+.cbtn.done{background:#27ae60;color:#fff;border-color:#27ae60}
+.cbtn.dis{opacity:.25;cursor:default;pointer-events:none}
+.status{text-align:center;font-size:13px}
+.csec{padding:13px 15px;border-top:0.5px solid var(--color-border-tertiary)}
+.cblock{margin-bottom:11px}
+.blbl{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+.blbl span{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.4px}
+.pill{font-size:11px;padding:2px 7px;border-radius:10px;font-weight:500}
+.po{background:var(--color-background-info);color:var(--color-text-info)}
+.pc{background:var(--color-background-success);color:var(--color-text-success)}
+.bbtns{display:flex;gap:6px;flex-wrap:wrap}
+.dh{height:0.5px;background:var(--color-border-tertiary);margin:11px 0}
+.bb{display:flex;gap:6px;flex-wrap:wrap}
+button{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);cursor:pointer;font-size:13px;font-weight:400;font-family:inherit;transition:all .15s;white-space:nowrap;background:var(--color-background-primary);color:var(--color-text-primary)}
+button:hover{background:var(--color-background-secondary)}
+button.blue{background:#1a3a5c;color:#fff;border-color:#1a3a5c}.blue:hover{background:#112840}
+button.teal{background:#0e7c7b;color:#fff;border-color:#0e7c7b}
+button.mint{background:#0d9488;color:#fff;border-color:#0d9488}
+button.sage{background:#5eada7;color:#fff;border-color:#5eada7}
+button.amber{background:#d97706;color:#fff;border-color:#d97706}
+button.green{background:#27ae60;color:#fff;border-color:#27ae60}
+button.fl{background:#27ae60!important;border-color:#27ae60!important;color:#fff!important}
+.toast{position:fixed;bottom:14px;right:14px;background:#1a1a2e;color:#fff;padding:8px 14px;border-radius:var(--border-radius-md);font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9999}
+.toast.on{opacity:1}
+</style>
+<div class="w">
+<div class="hdr"><div class="hdr-ico">📋</div><div><h1>발주서 → SAP 코드 변환기</h1><p>경구제 / CHX 분리 복사 · 스크린샷 붙여넣기 지원</p></div></div>
+<div class="toggles">
+  <span class="tog" id="tog-map" onclick="tp('mapPanel','tog-map')">📦 품목 매핑표 (18개)</span>
+  <span class="tog" id="tog-ven" onclick="tp('vendorPanel','tog-ven')">🏢 거래처 코드표 (34개)</span>
+</div>
+<div class="panel" id="mapPanel"><h3>SAP 품목 코드 매핑</h3><div class="grid2" id="mapGrid"></div></div>
+<div class="panel" id="vendorPanel"><h3>거래처 코드 목록</h3><div class="grid3" id="vendorGrid"></div></div>
+
+<!-- 업로드 2분할: 파일 / 스크린샷 -->
+<div class="upload-area">
+  <!-- 파일 업로드 -->
+  <div class="zone" id="drop" onclick="document.getElementById('fi').click()" ondragover="ev(event,'drag')" ondragleave="ev(event,'leave')" ondrop="ev(event,'drop')">
+    <input type="file" id="fi" accept=".xls,.xlsx,.pdf,.png,.jpg,.jpeg" onchange="onFI(this)">
+    <div class="ico">📁</div>
+    <div class="lbl">파일 업로드</div>
+    <div class="sub">XLS · XLSX · PDF · JPG · PNG<br>드래그 또는 클릭</div>
+  </div>
+  <!-- 스크린샷 붙여넣기 -->
+  <div class="zone paste-zone" id="pzone" onclick="focusPaste()">
+    <textarea id="paste-target" placeholder="" onpaste="onPaste(event)" onfocus="document.getElementById('pzone').classList.add('active')" onblur="document.getElementById('pzone').classList.remove('active')"></textarea>
+    <div class="ico">📸</div>
+    <div class="lbl">스크린샷 붙여넣기</div>
+    <div class="kbd-row"><span class="kbd">Ctrl</span><span style="font-size:12px;color:var(--color-text-secondary)">+</span><span class="kbd">V</span></div>
+    <div class="sub" style="margin-top:5px">클릭 후 Ctrl+V</div>
+  </div>
+</div>
+
+<div class="preview" id="pv"><h4>📸 붙여넣은 이미지</h4><img id="pimg" src="" alt=""><div class="iinfo" id="iinfo"></div></div>
+<div class="loader" id="loader"><div class="spin"></div><div class="lmsg" id="lmsg">처리 중...</div></div>
+<div class="err" id="err"><span id="emsg"></span><div class="edet" id="edet"></div></div>
+<div class="dbg" id="dbg"><h4>🔍 컬럼 탐지</h4><code id="dbgc"></code></div>
+<div class="vbanner" id="vbanner">
+  <div class="vb-left"><div class="vname" id="vname"></div><div id="vcode"></div></div>
+  <button class="blue" onclick="cpVendor()">📋 거래처 코드 복사</button>
+</div>
+<div class="result" id="result">
+  <div class="res-hdr">
+    <div><div class="title">품목 목록</div><div class="meta" id="meta"></div></div>
+    <div class="wbadge" id="wb"></div>
+  </div>
+  <table>
+    <thead><tr>
+      <th style="width:30px">No</th><th>품명</th><th>규격</th>
+      <th style="width:54px;text-align:center">수량</th><th>SAP 코드</th>
+      <th style="width:34px;text-align:center">✓</th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="csec">
+    <div class="cblock">
+      <div class="blbl"><span>💊 경구제</span><span class="pill po" id="oc">0개</span></div>
+      <div class="bbtns">
+        <button class="blue"  id="boc" onclick="co('code')">📋 코드만</button>
+        <button class="teal"  id="boq" onclick="co('qty')">🔢 수량만</button>
+        <button class="amber" id="bob" onclick="co('both')">⇄ 코드+수량</button>
+      </div>
+    </div>
+    <div class="dh"></div>
+    <div class="cblock">
+      <div class="blbl"><span>🧴 클로르헥시딘 (CHX)</span><span class="pill pc" id="cc">0개</span></div>
+      <div class="bbtns">
+        <button class="mint" id="bcc" onclick="cx('code')">📋 코드만</button>
+        <button class="sage" id="bcq" onclick="cx('qty')">🔢 수량만</button>
+        <button class="mint" id="bcb" onclick="cx('both')">⇄ 코드+수량</button>
+      </div>
+    </div>
+    <div class="dh"></div>
+    <div class="bb">
+      <button class="green" id="ball" onclick="ca()">📊 전체 표 복사</button>
+      <button onclick="reset()">🔄 새 파일</button>
+    </div>
+  </div>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const CHXC=new Set(['CHLOR100','CHLOR015']);
+const VD={"백제약품":926542,"지오영":928319,"복산나이스":550528,"경동사":936746,"인천약품":929285,"광주지오팜":928916,"대구지오팜":927196,"대전지오팜":927957,"서울지오팜":931410,"김약품":929208,"동원약품":928320,"대전동원약품":948154,"동원헬스케어":948156,"동원아이팜":948155,"훼밀리팜":945619,"백광약품":948494,"서울약사신협":927198,"세화약품":933364,"신덕약품":935437,"우정약품":930275,"유진약품":928917,"태전약품":927212,"티제이팜":929483,"연성약품":940143,"아이팜코리아":930134,"수정약품":939268,"이엠디":918682,"우분트팜":943287,"프리모":939767,"선메디텍":944081,"에스팜":940899,"비엘팜":941675,"성도약품":939568,"가온약품":933982};
+const MAP=[{code:"CHLOR100",k:["클로르헥시딘","chlorhexidine","chx"],s:["100ml","100mL","10ea"],label:"클로르헥시딘액 100ML"},{code:"CHLOR015",k:["클로르헥시딘","chlorhexidine","chx"],s:["15ml","15mL","15포","6포","6ea"],label:"클로르헥시딘액 15ML"},{code:"OP-NA0300",k:["나프록소","naproxo","naproxen"],s:["300정","300t"],label:"NAPROXO TABLET 300T"},{code:"OP-NA0030",k:["나프록소","naproxo","naproxen"],s:["30정","30t"],label:"오스템 나프록소 30정"},{code:"OP-LO0500",k:["록소리펜","록소리렌","loxolifen"],s:["500정","500t"],label:"LOXOLIFEN TABLET 500T"},{code:"OP-LO0030",k:["록소리펜","록소리렌","loxolifen"],s:["30정","30t"],label:"LOXOLIFEN TABLET 30T"},{code:"OP-MO0100",k:["모사프리","mosapri"],s:["100정","100t"],label:"모사프리정 100T"},{code:"OP-MO0030",k:["모사프리","mosapri"],s:["30정","30t"],label:"MOSAPRI TABLET 30T"},{code:"OP-CF0100",k:["세파클리","cefacli"],s:["100캡","100c"],label:"CEFACLI CAPSULE 100C"},{code:"OP-CF0030",k:["세파클리","cefacli"],s:["30캡","30c"],label:"CEFACLI CAPSULE 30C"},{code:"OP-AM0500",k:["아목시스","amoxis"],s:["500캡","500c"],label:"AMOXIS CAPSULE 500C"},{code:"OP-AM0300",k:["아목시스","amoxis"],s:["300캡","300c"],label:"AMOXIS CAPSULE 300C"},{code:"OP-AM0030",k:["아목시스","amoxis"],s:["30캡","30c"],label:"AMOXIS CAPSULE 30C"},{code:"OP-AC0100",k:["아목시클라","아목시콜라","amoxicla"],s:[],label:"AMOXICLA TABLET 100T"},{code:"OP-AF0100",k:["아세클로페낙"],s:["100"],label:"아세클로페낙정 100T"},{code:"OP-AF0030",k:["아세클로페낙"],s:["30"],label:"아세클로페낙정 30T"},{code:"OP-AL0500",k:["알마펜","almafen"],s:[],label:"ALMAFEN TABLET 500T"},{code:"OP-ESO0028",k:["에스오메프라졸","esomeprazole","eso"],s:[],label:"에스오메프라졸 28정"}];
+const AKW=MAP.flatMap(m=>m.k);
+function hpk(v){const s=String(v||'').toLowerCase();return s&&AKW.some(k=>s.includes(k));}
+const SPR=/정\(|캡슐\(|ml|포|ptp|\d+정|\d+캡/i;
+function hsp(v){return SPR.test(String(v||''));}
+function dm(n,s){const c=(n+' '+s).toLowerCase();for(const m of MAP){if(!m.k.some(k=>c.includes(k)))continue;if(!m.s.length)return m.code;if(m.s.some(x=>c.includes(x.toLowerCase())))return m.code;}return null;}
+function fv(n){if(!n)return null;const t=n.trim();if(VD[t])return{name:t,code:VD[t]};for(const[k,v]of Object.entries(VD))if(t.includes(k)||k.includes(t))return{name:k,code:v};return null;}
+
+document.getElementById('mapGrid').innerHTML=MAP.map(m=>`<div class="gi"><span class="gc">${m.code}</span><span class="gn">${m.label}</span></div>`).join('');
+document.getElementById('vendorGrid').innerHTML=Object.entries(VD).map(([n,c])=>`<div class="gi"><span class="gc">${c}</span><span class="gn">${n}</span></div>`).join('');
+function tp(id,t){const p=document.getElementById(id),el=document.getElementById(t);const o=p.style.display==='block';p.style.display=o?'none':'block';el.classList.toggle('on',!o);}
+
+/* 드래그앤드롭 */
+function ev(e,type){
+  if(type==='drag'){e.preventDefault();document.getElementById('drop').classList.add('active');}
+  else if(type==='leave'){document.getElementById('drop').classList.remove('active');}
+  else if(type==='drop'){e.preventDefault();document.getElementById('drop').classList.remove('active');if(e.dataTransfer.files[0])runFile(e.dataTransfer.files[0]);}
+}
+function onFI(el){if(el.files[0])runFile(el.files[0]);}
+
+/* ★ 붙여넣기 — textarea에 포커스 준 상태에서 Ctrl+V */
+function focusPaste(){document.getElementById('paste-target').focus();}
+async function onPaste(e){
+  e.preventDefault();
+  const items=[...(e.clipboardData||{items:[]}).items];
+  const it=items.find(i=>i.type.startsWith('image/'));
+  if(!it){toast('⚠ 클립보드에 이미지가 없어요');return;}
+  const raw=it.getAsFile();
+  if(!raw){toast('⚠ 이미지 파일을 가져올 수 없어요');return;}
+  document.getElementById('pzone').classList.add('active');
+  setTimeout(()=>document.getElementById('pzone').classList.remove('active'),800);
+  sl(true,'이미지 압축 중...');
+  he();hide('result');hide('vbanner');hide('dbg');
+  try{
+    const{blob,w,h}=await compress(raw);
+    const url=URL.createObjectURL(blob);
+    document.getElementById('pimg').src=url;
+    document.getElementById('iinfo').textContent=`✅ ${w}×${h}px · ${Math.round(blob.size/1024)}KB 압축 완료`;
+    sh('pv');
+    await pm(blob,'image/jpeg','image');
+  }catch(err){se(err.message,err.cause||String(err));}
+  finally{sl(false);}
+}
+
+/* Canvas 압축 최대 1400px JPEG 0.82 */
+function compress(blob){
+  return new Promise(r=>{
+    const img=new Image(),url=URL.createObjectURL(blob);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      const M=1400;let{width:w,height:h}=img;
+      if(w>M||h>M){if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;}}
+      const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      cv.toBlob(b=>r({blob:b,w,h}),'image/jpeg',0.82);
+    };
+    img.onerror=()=>r({blob,w:0,h:0});img.src=url;
+  });
+}
+function b64(blob){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(blob);});}
+
+/* 파일 처리 */
+function runFile(file){
+  const ext=(file.name||'').split('.').pop().toLowerCase();
+  if(['xls','xlsx'].includes(ext))runXLS(file);
+  else if(ext==='pdf'||file.type==='application/pdf')runBlob(file,'application/pdf');
+  else runBlob(file,file.type||'image/jpeg');
+}
+async function runBlob(blob,mt){
+  sl(true,'분석 중...');he();hide('result');hide('vbanner');hide('dbg');
+  try{
+    if(mt==='application/pdf')await pm(blob,mt,'document');
+    else{
+      sl(true,'이미지 압축 중...');
+      const{blob:cb,w,h}=await compress(blob);
+      document.getElementById('iinfo').textContent=`✅ ${w}×${h}px · ${Math.round(cb.size/1024)}KB`;
+      sh('pv');
+      await pm(cb,'image/jpeg','image');
+    }
+  }catch(e){se(e.message,e.cause||String(e));}finally{sl(false);}
+}
+async function runXLS(file){
+  sl(true,'Excel 파싱 중...');he();hide('result');hide('vbanner');hide('dbg');
+  try{await pxls(file);}catch(e){se(e.message,e.cause||String(e));}finally{sl(false);}
+}
+
+/* API 호출 */
+async function pm(blob,mt,type){
+  sl(true,type==='document'?'PDF 분석 중...':'이미지 분석 중 (Claude Vision)...');
+  let b;try{b=await b64(blob);}catch(e){throw new Error('이미지 변환 실패: '+e.message);}
+  const h={'Content-Type':'application/json'};if(type==='document')h['anthropic-beta']='pdfs-2024-09-25';
+  const blk=type==='document'?{type:'document',source:{type:'base64',media_type:mt,data:b}}:{type:'image',source:{type:'base64',media_type:mt,data:b}};
+  const mpt=MAP.map(m=>`${m.code}: ${m.label} / 키=[${m.k.join('|')}] 규격=[${m.s.join('|')||'없음'}]`).join('\n');
+  let res;
+  try{res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:h,body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,system:`발주서 파싱. 거래처명과 품목(no/productName/spec/quantity) 추출, 품명+규격 조합으로 SAP 코드 매핑.\n${mpt}\n순수JSON만: {"vendor":"","items":[{"no":1,"productName":"","spec":"","quantity":0,"sapCode":"","matched":true}]}`,messages:[{role:'user',content:[blk,{type:'text',text:'발주서 파싱 후 JSON 반환.'}]}]}));}
+  catch(e){throw new Error('API 연결 실패 (네트워크 오류)',{cause:`에러: ${e.message}\n크기: ${Math.round(blob.size/1024)}KB`});}
+  const d=await res.json();
+  if(!res.ok||d.error)throw new Error('API 오류: '+(d.error?.message||res.status),{cause:JSON.stringify(d).slice(0,300)});
+  const t=d.content?.find(x=>x.type==='text')?.text||'';
+  const m=t.match(/\{[\s\S]*\}/);if(!m)throw new Error('JSON 추출 실패',{cause:t.slice(0,200)});
+  const p=JSON.parse(m[0]);render(p.vendor||'',p.items||[]);
+}
+
+/* Excel 파서 */
+function dc(dr){
+  const t=dr.length;if(!t)return{nc:5,sc:12,qc:16};
+  const f=dr[0];let qc=16;
+  for(let c=f.length-1;c>=3;c--){if(dr.every(r=>typeof r[c]==='number'&&r[c]>=0)&&dr.some(r=>r[c]>0)){qc=c;break;}}
+  let nc=5,bn=0;
+  for(let c=2;c<qc;c++){const v=dr.map(r=>String(r[c]||'').trim()).filter(v=>v&&!/^\d{6,}$/.test(v));if(!v.length)continue;const s=v.filter(x=>hpk(x)).length/t;if(s>bn){bn=s;nc=c;}}
+  let sc=nc+1,bs=0;
+  for(let c=nc+1;c<qc;c++){const v=dr.map(r=>String(r[c]||'').trim()).filter(v=>v);if(!v.length)continue;const s=v.filter(x=>hsp(x)).length/t;if(s>bs){bs=s;sc=c;}}
+  return{nc,sc,qc};
+}
+async function pxls(file){
+  const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
+  const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  let vr='';
+  for(let r=0;r<Math.min(6,raw.length);r++){const v=String(raw[r][0]||'').trim();if(v&&v!=='No'&&!/^발/.test(v)&&!/^PU/.test(v)&&!/^구매/.test(v)&&!/^입고/.test(v)){vr=v;break;}}
+  const dr=raw.filter(row=>{const n=row[0];return typeof n==='number'&&Number.isInteger(n)&&n>=1&&n<=999;});
+  if(!dr.length)throw new Error('데이터 행을 찾을 수 없습니다.');
+  const{nc,sc,qc}=dc(dr);
+  document.getElementById('dbgc').textContent=`품명 col[${nc}]="${String(dr[0][nc]||'').trim()}"  |  규격 col[${sc}]="${String(dr[0][sc]||'').trim()}"  |  수량 col[${qc}]=${dr[0][qc]}`;
+  sh('dbg');
+  const ex=dr.map(row=>{const nm=String(row[nc]||'').trim(),sp=String(row[sc]||'').trim(),qty=Number(row[qc])||0;const sap=dm(nm,sp);return{no:row[0],productName:nm,spec:sp,quantity:qty,sapCode:sap||'미매핑',matched:!!sap};});
+  const um=ex.filter(e=>!e.matched);
+  if(um.length){sl(true,`미매핑 ${um.length}개 → Claude 재매핑 중...`);await cr(ex,um);}
+  render(vr,ex);
+}
+async function cr(all,um){
+  const mpt=MAP.map(m=>`${m.code}: 키=[${m.k.join('|')}] 규격=[${m.s.join('|')||'없음'}]`).join('\n');
+  const pr=`미매핑 품목 SAP 코드.\n${mpt}\n\n미매핑:\n`+um.map(u=>`no:${u.no} 품명:"${u.productName}" 규격:"${u.spec}"`).join('\n')+`\n\n순수JSON만:\n[{"no":1,"sapCode":"OP-XX"}]`;
+  try{const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,messages:[{role:'user',content:pr}]})});const d=await res.json();const t=d.content?.find(b=>b.type==='text')?.text||'';const m=t.match(/\[[\s\S]*\]/);if(!m)return;JSON.parse(m[0]).forEach(r=>{const it=all.find(a=>a.no===r.no);if(it&&r.sapCode&&r.sapCode!=='미매핑'){it.sapCode=r.sapCode;it.matched=true;}});}catch(_){}
+}
+
+function isC(r){return CHXC.has(r.sapCode);}
+let rows=[],cv=null;
+function render(vr,its){
+  rows=its;cv=fv(vr);
+  document.getElementById('vbanner').style.display='flex';
+  document.getElementById('vname').textContent=cv?.name||vr||'거래처 미인식';
+  document.getElementById('vcode').innerHTML=cv?`<span class="vcode">${cv.code}</span>`:`<span class="vunk">⚠ 미등록 거래처</span>`;
+  const ok=its.filter(i=>i.matched).length,um=its.length-ok;
+  document.getElementById('meta').textContent=`총 ${its.length}개 · ${ok}개 매핑 완료`;
+  const wb=document.getElementById('wb');if(um>0){wb.style.display='block';wb.textContent=`⚠ 미매핑 ${um}개`;}else wb.style.display='none';
+  document.getElementById('oc').textContent=`${its.filter(r=>r.matched&&!isC(r)).length}개`;
+  document.getElementById('cc').textContent=`${its.filter(r=>r.matched&&isC(r)).length}개`;
+  document.getElementById('tbody').innerHTML=its.map((it,i)=>{const c=isC(it);return`<tr class="${c?'chx':''}"><td class="no-col">${it.no}</td><td>${it.productName}${c?'<span class="chxtag">CHX</span>':''}</td><td style="font-size:12px;color:var(--color-text-secondary)">${it.spec||'-'}</td><td class="qty-col">${it.quantity}</td><td><div class="sc"><span class="sap ${it.matched?(c?'cs':''):'ms'}">${it.sapCode}</span><span class="cbtn ${it.matched?'':'dis'}" id="cb${i}" onclick="cpcode('${it.sapCode}',${i})">⎘</span></div></td><td class="status">${it.matched?'✅':'❌'}</td></tr>`;}).join('');
+  sh('result');
+}
+function gt(s,m){return m==='code'?s.map(r=>r.sapCode).join('\n'):m==='qty'?s.map(r=>r.quantity).join('\n'):s.map(r=>`${r.sapCode}\t${r.quantity}`).join('\n');}
+function fl(id){const b=document.getElementById(id);if(!b)return;b.classList.add('fl');setTimeout(()=>b.classList.remove('fl'),1100);}
+function co(m){const s=rows.filter(r=>r.matched&&!isC(r));navigator.clipboard.writeText(gt(s,m)).then(()=>{fl(`bo${m[0]}`);toast(`💊 경구제 ${s.length}개 복사!`);});}
+function cx(m){const s=rows.filter(r=>r.matched&&isC(r));navigator.clipboard.writeText(gt(s,m)).then(()=>{fl(`bc${m[0]}`);toast(`🧴 CHX ${s.length}개 복사!`);});}
+function ca(){const vh=cv?`거래처: ${cv.name} (${cv.code})\n\n`:'';const hd='No\t품명\t규격\t수량\tSAP코드';const bd=rows.map(r=>`${r.no}\t${r.productName}\t${r.spec||''}\t${r.quantity}\t${r.sapCode}`);navigator.clipboard.writeText(vh+[hd,...bd].join('\n')).then(()=>{fl('ball');toast('📊 전체 복사!');});}
+function cpcode(code,i){if(code==='미매핑')return;navigator.clipboard.writeText(code).then(()=>{const b=document.getElementById(`cb${i}`);b.textContent='✓';b.classList.add('done');setTimeout(()=>{b.textContent='⎘';b.classList.remove('done');},1400);});}
+function cpVendor(){if(!cv){toast('⚠ 미등록 거래처');return;}navigator.clipboard.writeText(String(cv.code)).then(()=>toast(`📋 ${cv.code} 복사!`));}
+function reset(){hide('result');hide('vbanner');hide('dbg');hide('pv');he();document.getElementById('fi').value='';rows=[];cv=null;document.getElementById('pimg').src='';}
+function sl(v,msg){document.getElementById('loader').style.display=v?'block':'none';if(msg)document.getElementById('lmsg').textContent=msg;}
+function sh(id){const e=document.getElementById(id);e.style.display=id==='vbanner'?'flex':'block';}
+function hide(id){document.getElementById(id).style.display='none';}
+function he(){document.getElementById('err').style.display='none';}
+function se(msg,det){document.getElementById('emsg').textContent='❌ '+msg;const d=document.getElementById('edet');if(det){d.textContent=det;d.style.display='block';}else d.style.display='none';document.getElementById('err').style.display='block';}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
+</script>
